@@ -1,0 +1,138 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "name": {
+            "type": "String"
+        },
+        "location": {
+            "type": "String"
+        },
+        "hostingPlanName": {
+            "type": "String"
+        },
+        "alwaysOn": {
+            "type": "Bool"
+        },
+        "sku": {
+            "type": "String"
+        },
+        "skuCode": {
+            "type": "String"
+        },
+        "workerSize": {
+            "type": "String"
+        },
+        "workerSizeId": {
+            "type": "String"
+        },
+        "numberOfWorkers": {
+            "type": "String"
+        },
+        "currentStack": {
+            "type": "String"
+        },
+        "phpVersion": {
+            "type": "String"
+        },
+        "environments": {
+            "defaultValue": [
+                {
+                    "name" : "staging",
+                    "buildVersion" : ""
+                }
+            ],
+            "type": "array",
+            "metadata": {
+                "description": "Array with the names for the environment slots"
+            },
+            "maxLength": 19
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[parameters('hostingPlanName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [],
+            "tags": {},
+            "sku": {
+                "Tier": "[parameters('sku')]",
+                "Name": "[parameters('skuCode')]"
+            },
+            "kind": "",
+            "properties": {
+                "name": "[parameters('hostingPlanName')]",
+                "workerSize": "[parameters('workerSize')]",
+                "workerSizeId": "[parameters('workerSizeId')]",
+                "numberOfWorkers": "[parameters('numberOfWorkers')]"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "name": "[parameters('name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]"
+            ],
+            "tags": {},
+            "properties": {
+                "name": "[parameters('name')]",
+                "siteConfig": {
+                    "metadata": [
+                        {
+                            "name": "CURRENT_STACK",
+                            "value": "[parameters('currentStack')]"
+                        }
+                    ],
+                    "phpVersion": "[parameters('phpVersion')]",
+                    "alwaysOn": "[parameters('alwaysOn')]"
+                },
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName'))]",
+                "clientAffinityEnabled": true
+            }
+        },
+        {
+            "apiVersion": "2020-06-01",
+            "type": "Microsoft.Web/sites/slots",
+            "name": "[concat(parameters('name'), '/', parameters('environments')[copyIndex()].name)]",
+            "kind": "app",
+            "location": "[parameters('location')]",
+            "comments": "This specifies the web app slots.",
+            "tags": {
+                "displayName": "WebAppSlots"
+            },
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName'))]",
+                "buildVersion": "[parameters('environments')[copyIndex()].buildVersion]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/Sites', parameters('name'))]"
+            ],
+            "copy": {
+                "name": "webPortalSlot",
+                "count": "[length(parameters('environments'))]"
+            }
+        }
+    ],
+    "outputs" : {
+        "hostname" : {
+            "type" : "string",
+            "value" : "[reference(resourceId('Microsoft.Web/sites', parameters('name')), '2018-02-01').defaultHostName]"
+        },
+        "deploymentSlotHostName" : {
+            "type" : "string",
+            "value" : "[reference(resourceId('Microsoft.Web/sites/slots', parameters('name'), parameters('environments')[0].name)).defaultHostName]"
+        },
+        "deploymentSlotName" : {
+            "type" : "string",
+            "value" : "[parameters('environments')[0].name]"
+        },
+        "appName" : {
+            "type" : "string",
+            "value" : "[parameters('name')]"
+        }
+    }
+}
